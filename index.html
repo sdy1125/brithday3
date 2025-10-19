@@ -30,7 +30,18 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
             animation: fadeIn 2s ease-in-out;
             position: relative;
-            z-index: 10; /* Đảm bảo nội dung nằm trên hiệu ứng tuyết */
+            z-index: 10; /* Nội dung chính */
+        }
+
+        /* --- Cài đặt Z-index cho Hiệu ứng --- */
+        #effect-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Rất quan trọng: cho phép click xuyên qua hiệu ứng */
+            z-index: 20; /* Đặt Z-INDEX CAO HƠN container (10) và nút nhạc (100) để hiệu ứng hiện lên trên cùng */
         }
 
         @keyframes fadeIn {
@@ -39,14 +50,14 @@
         }
 
         h1 {
-            color: #ad1457; /* Màu đỏ hồng nổi bật */
+            color: #ad1457;
             font-size: 3em;
             margin-bottom: 5px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         h2 {
-            color: #880e4f; /* Màu tím hồng */
+            color: #880e4f;
             font-size: 1.5em;
             border-bottom: 3px solid #f8bbd0;
             display: inline-block;
@@ -90,37 +101,53 @@
             border-radius: 50%;
             cursor: pointer;
             font-size: 1.5em;
-            z-index: 100;
+            z-index: 101; /* Đảm bảo nút này vẫn click được */
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             transition: background-color 0.3s;
         }
-        #music-button:hover {
-            background-color: #d81b60;
-        }
 
-        /* --- CSS Hiệu ứng Tuyết/Hoa Rơi (Snow effect) --- */
-        .snow {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 1; 
-        }
-
-        .snowflake {
+        /* --- Hiệu ứng Rơi và Trái tim (Snowflake và Heart) --- */
+        .snowflake, .heart {
             position: absolute;
-            color: #fff;
-            font-size: 15px;
             top: -20px;
+            animation-timing-function: linear;
+        }
+
+        /* Heart effect: bay lên và biến mất */
+        .heart {
+            color: #e91e63; 
+            animation: flyup linear infinite;
+        }
+        @keyframes flyup {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-100vh); opacity: 0; }
+        }
+
+        /* Snowflake effect: rơi xuống */
+        .snowflake {
+            color: #fff;
             animation: fall linear infinite;
         }
-
         @keyframes fall {
             to {
                 transform: translateY(100vh);
             }
+        }
+
+        /* --- Hiệu ứng Pháo hoa (Fireworks) --- */
+        .firework {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: #ffeb3b; /* Vàng */
+            opacity: 0;
+            animation: explode 1s ease-out;
+        }
+
+        @keyframes explode {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(5); opacity: 0; }
         }
     </style>
 </head>
@@ -158,83 +185,152 @@
         
     </div>
     
-    <div class="snow" id="snow-container"></div>
+    <div id="effect-layer"></div>
 
     <script>
         const music = document.getElementById('background-music');
         const musicButton = document.getElementById('music-button');
-        const snowContainer = document.getElementById('snow-container');
+        const effectLayer = document.getElementById('effect-layer');
         let isPlaying = false;
 
-        // Bắt sự kiện click để bật/tắt nhạc (cần thiết vì trình duyệt chặn autoplay)
+        // --- Kiểm soát Âm thanh (Giữ nguyên) ---
         musicButton.addEventListener('click', () => {
             if (isPlaying) {
                 music.pause();
                 musicButton.textContent = '🔇';
                 musicButton.title = 'Bật Nhạc Nền';
             } else {
-                // Thử phát nhạc
                 music.play().then(() => {
                     musicButton.textContent = '🎵';
                     musicButton.title = 'Tắt Nhạc Nền';
                 }).catch(error => {
-                    // Xử lý nếu trình duyệt vẫn chặn (thông báo cho người dùng)
-                    console.error("Autoplay bị chặn, người dùng cần tương tác thêm.");
+                    console.error("Autoplay bị chặn.");
                 });
             }
             isPlaying = !isPlaying;
         });
 
-        // Tự động thử phát nhạc khi tải trang (có thể bị chặn)
         document.addEventListener('DOMContentLoaded', () => {
-            music.volume = 0.6; // Điều chỉnh âm lượng
+            music.volume = 0.6;
             music.play().then(() => {
                 isPlaying = true;
                 musicButton.textContent = '🎵';
             }).catch(error => {
-                // Nếu bị chặn, để mặc định là Tắt
                 isPlaying = false;
                 musicButton.textContent = '🔇';
             });
         });
 
+        // --- Hiệu ứng 1: Hoa Rơi/Tuyết Rơi (Rơi xuống) ---
+        const fallEmojis = ['🌸', '🌹', '💖', '✨', '🎁', '⭐'];
+        const numFallEffects = 40;
 
-        // --- Hiệu ứng Rơi (Flower/Snow Fall) ---
-        const emojis = ['🌸', '🌹', '💖', '✨']; // Có thể thay bằng '❄️' nếu muốn tuyết
-        const numberOfSnowflakes = 40;
+        function createFallEffect() {
+            const el = document.createElement('div');
+            el.classList.add('snowflake'); // Dùng chung class snowflake cho hiệu ứng rơi
+            el.innerHTML = fallEmojis[Math.floor(Math.random() * fallEmojis.length)];
 
-        function createSnowflake() {
-            const snowflake = document.createElement('div');
-            snowflake.classList.add('snowflake');
+            el.style.left = Math.random() * 100 + 'vw';
+            el.style.opacity = Math.random() * 0.5 + 0.5; // Đảm bảo không quá mờ
+            el.style.fontSize = Math.random() * 15 + 10 + 'px';
             
-            // Chọn ngẫu nhiên biểu tượng
-            snowflake.innerHTML = emojis[Math.floor(Math.random() * emojis.length)];
+            const duration = Math.random() * 10 + 10;
+            el.style.animationDuration = duration + 's';
+            el.style.animationDelay = Math.random() * 10 + 's';
 
-            // Vị trí và kích thước ngẫu nhiên
-            snowflake.style.left = Math.random() * 100 + 'vw';
-            snowflake.style.opacity = Math.random();
-            snowflake.style.fontSize = Math.random() * 15 + 10 + 'px'; // 10px đến 25px
+            effectLayer.appendChild(el);
 
-            // Thời gian và độ trễ ngẫu nhiên
-            const duration = Math.random() * 10 + 10; // 10s đến 20s
-            snowflake.style.animationDuration = duration + 's';
-            snowflake.style.animationDelay = Math.random() * 10 + 's';
-
-            snowContainer.appendChild(snowflake);
-
-            // Xóa phần tử sau khi rơi xong để tránh quá tải DOM
             setTimeout(() => {
-                snowflake.remove();
+                el.remove();
             }, duration * 1000);
         }
 
-        // Tạo ra các phần tử rơi ban đầu
-        for (let i = 0; i < numberOfSnowflakes; i++) {
-            createSnowflake();
+        for (let i = 0; i < numFallEffects; i++) {
+            createFallEffect();
         }
+        setInterval(createFallEffect, 500);
 
-        // Liên tục tạo thêm hoa/tuyết rơi để hiệu ứng không bị ngắt quãng
-        setInterval(createSnowflake, 500); 
+
+        // --- Hiệu ứng 2: Trái Tim Bay Lên (Bay lên) ---
+        function createHeartEffect() {
+            const heart = document.createElement('div');
+            heart.classList.add('heart');
+            heart.innerHTML = '❤️';
+            
+            heart.style.left = Math.random() * 100 + 'vw';
+            heart.style.fontSize = Math.random() * 20 + 15 + 'px';
+            heart.style.animationDuration = Math.random() * 3 + 4 + 's'; 
+            heart.style.animationDelay = '0s'; // Không delay để bay ngay lập tức
+
+            effectLayer.appendChild(heart);
+
+            setTimeout(() => {
+                heart.remove();
+            }, 7000); // Xóa sau 7 giây
+        }
+        setInterval(createHeartEffect, 200); // Tăng tần suất trái tim
+
+
+        // --- Hiệu ứng 3: Pháo Hoa (Ngẫu nhiên vị trí) ---
+        const fireworkColors = ['#ffeb3b', '#ff4081', '#4dd0e1', '#aeea00'];
+
+        function createFirework(x, y) {
+            const color = fireworkColors[Math.floor(Math.random() * fireworkColors.length)];
+            const particleCount = 20;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.classList.add('firework');
+                particle.style.background = color;
+                
+                // Vị trí xuất phát của pháo hoa
+                particle.style.left = x + 'px';
+                particle.style.top = y + 'px';
+
+                // Tạo quỹ đạo ngẫu nhiên cho từng hạt
+                const angle = Math.random() * 360;
+                const distance = Math.random() * 100 + 50; 
+                const endX = x + distance * Math.cos(angle * Math.PI / 180);
+                const endY = y + distance * Math.sin(angle * Math.PI / 180);
+
+                // CSS cho quỹ đạo
+                particle.style.setProperty('--end-x', endX + 'px');
+                particle.style.setProperty('--end-y', endY + 'px');
+                
+                // Ghi đè animation để thêm hiệu ứng di chuyển
+                particle.style.animation = `
+                    move ${Math.random() * 0.5 + 0.5}s ease-out forwards,
+                    explode 1s ease-out ${Math.random() * 0.1}s
+                `;
+
+                // Keyframes động cho quỹ đạo
+                const style = document.createElement('style');
+                style.innerHTML = `
+                    @keyframes move {
+                        100% { 
+                            transform: translate(${endX - x}px, ${endY - y}px); 
+                            opacity: 0;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                effectLayer.appendChild(particle);
+
+                setTimeout(() => {
+                    particle.remove();
+                    style.remove();
+                }, 1500); 
+            }
+        }
+        
+        // Tạo pháo hoa ngẫu nhiên sau mỗi 1.5 giây
+        setInterval(() => {
+            const x = Math.random() * window.innerWidth;
+            const y = Math.random() * window.innerHeight * 0.5; // Tập trung ở nửa trên
+            createFirework(x, y);
+        }, 1500);
+
     </script>
 
 </body>
